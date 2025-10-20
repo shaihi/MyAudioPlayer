@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>שיעור מעשי: BroadcastReceiver ב-Android</title>
+    <!-- טעינת Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- הגדרת גופן Inter כברירת מחדל -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .code-block {
+            background-color: #1e293b;
+            color: #f8fafc;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+            direction: ltr; /* קוד תמיד משמאל לימין */
+        }
+        .code-block pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8 min-h-screen flex items-center justify-center">
+
+    <div id="lessonContainer" class="bg-white shadow-2xl rounded-xl w-full max-w-4xl p-6 sm:p-10 transition-all duration-500 transform border-t-8 border-indigo-600" dir="rtl">
+
+        <!-- כותרת השיעור ואינדיקטור התקדמות -->
+        <div class="mb-6 border-b pb-4">
+            <h1 class="text-3xl font-extrabold text-gray-900 mb-2" id="lessonTitle"></h1>
+            <p class="text-sm text-indigo-600 font-semibold" id="slideIndicator"></p>
+        </div>
+
+        <!-- תוכן השקופית הנוכחית -->
+        <div id="slideContent" class="space-y-6">
+            <!-- כותרת השקופית -->
+            <h2 class="text-2xl font-bold text-gray-800" id="slideHeadline"></h2>
+
+            <!-- תיאור ומידע -->
+            <div id="slideDescription" class="text-gray-600 leading-relaxed text-lg space-y-4"></div>
+
+            <!-- קוד (מוצג רק אם קיים) -->
+            <div id="slideCodeContainer" class="hidden">
+                <p class="text-sm font-semibold text-gray-700 mb-2">קוד להעתקה:</p>
+                <div class="code-block">
+                    <pre id="slideCode"></pre>
+                </div>
+            </div>
+
+            <!-- משימה/הוראה לתלמיד -->
+            <div id="slideTaskContainer" class="p-4 bg-yellow-50 border-r-4 border-yellow-400 rounded-lg">
+                <h3 class="font-bold text-lg text-yellow-800 mb-1">🎯 המשימה שלך:</h3>
+                <p class="text-yellow-700" id="slideTask"></p>
+            </div>
+        </div>
+
+        <!-- כפתורי ניווט -->
+        <div class="mt-8 pt-6 border-t flex justify-between">
+            <button id="prevButton" class="px-6 py-3 bg-gray-300 text-gray-800 font-bold rounded-full shadow-md hover:bg-gray-400 transition-all duration-300 disabled:opacity-50" disabled>
+                חזור
+            </button>
+            <button id="nextButton" class="px-6 py-3 bg-indigo-600 text-white font-bold rounded-full shadow-lg hover:bg-indigo-700 transition-all duration-300 hover:scale-105">
+                הבא
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        // הגדרת תוכן השיעור
+        const LESSON_TITLE = "שיעור מעשי: BroadcastReceiver ב-Android ו-Java";
+
+        const slides = [
+            {
+                headline: "ברוכים הבאים לשיעור המעשי! 🚀",
+                description: "<p>בשיעור זה נלמד כיצד לבנות אפליקציית Android שתגיב אוטומטית לשינויים ברשת ה-Wi-Fi של המכשיר.</p><p class='font-bold mt-2'>מטרה:</p><ul><li class='list-disc pr-4'>להבין מהו BroadcastReceiver.</li><li class='list-disc pr-4'>לבצע רישום דינמי ל-Receiver.</li><li class='list-disc pr-4'>לתקשר בין Receiver לפעילות (Activity).</li></ul>",
+                code: null,
+                task: "ודא ש-Android Studio פתוח ויש לך פרויקט Java בסיסי מוכן. נתחיל עם ההכנות.",
+                time: "זמן מוקצב: 5 דקות"
+            },
+            {
+                headline: "שלב 1: הרשאות (Permissions)",
+                description: "<p>כדי שהאפליקציה תוכל 'לרחרח' אחרי שינויים ברשת, עלינו לבקש הרשאות מהמערכת.</p><p>הקובץ <code>AndroidManifest.xml</code> הוא ה'דרכון' של האפליקציה שלך.</p>",
+                code: `<!-- הוסף הרשאות אלו מחוץ לתג <application> -->
+<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+<uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />`,
+                task: "העתק את שתי ההרשאות והוסף אותן לקובץ <code>AndroidManifest.xml</code>.",
+                time: "זמן מוקצב: 5 דקות"
+            },
+            {
+                headline: "שלב 2: עיצוב בסיסי (Layout)",
+                description: "<p>נכין מקום על המסך שבו נוכל להציג את סטטוס ה-Wi-Fi המעודכן.</p><p>נשתמש ב-<code>TextView</code> בקובץ <code>activity_main.xml</code>.</p>",
+                code: `<!-- בתוך ConstraintLayout או Layout אחר, הוסף: -->
+<TextView
+    android:id="@+id/wifiStatusTextView"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:text="מצב Wi-Fi: לא ידוע"
+    android:textSize="24sp"
+    app:layout_constraintBottom_toBottomOf="parent"
+    app:layout_constraintLeft_toLeftOf="parent"
+    app:layout_constraintRight_toRightOf="parent"
+    app:layout_constraintTop_toTopOf="parent" />`,
+                task: "הוסף את ה-<code>TextView</code> עם ה-ID <code>wifiStatusTextView</code> לקובץ ה-Layout שלך.",
+                time: "זמן מוקצב: 5 דקות"
+            },
+            {
+                headline: "שלב 3: כתיבת ה-Receiver עם Listener",
+                description: `
+                    <p class="font-bold text-indigo-700">1. יצירת המחלקה (ב-Android Studio):</p>
+                    <ol class="list-decimal pr-6 space-y-2">
+                        <li>נווט בחלון הפרויקט (Project Window) לספריית ה-Java של האפליקציה שלך.</li>
+                        <li>לחץ קליק ימני על שם החבילה (לדוגמה: <code>com.example.myapp</code>).</li>
+                        <li>בחר: <strong>New</strong> &rarr; <strong>Java Class</strong>.</li>
+                        <li>תן למחלקה את השם: <strong><code>WifiChangeReceiver</code></strong>.</li>
+                    </ol>
+
+                    <p class="font-bold text-indigo-700 mt-4">2. מהו ממשק (Interface) ולמה הוא חשוב?</p>
+                    <p>ממשק הוא 'חוזה' תכנותי המגדיר קבוצת פעולות (מתודות) שכל מחלקה המיישמת אותו חייבת לספק.  </p>
+                    <ul>
+                        <li class='list-disc pr-4'><strong>למה אנחנו צריכים אותו?</strong> ה-<code>BroadcastReceiver</code> פועל ברקע ואין לו גישה ישירה ל-UI של ה-<code>Activity</code>.</li>
+                        <li class='list-disc pr-4'>ה-<code>Listener</code> (הממשק) מאפשר ל-<code>Receiver</code> 'לשדר' את הסטטוס, וה-<code>Activity</code> שמיישמת את ה'חוזה' (ה-Listener) מקבלת את השידור ויכולה לעדכן את המסך בבטחה.</li>
+                    </ul>
+                    <p class="mt-4">כעת, העתק את הקוד כולל הממשק כדי להתחיל.</p>
+                `,
+                code: `import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
+
+public class WifiChangeReceiver extends BroadcastReceiver {
+
+    // 1. ממשק תקשורת (Listener)
+    public interface WifiStatusListener {
+        void onWifiStatusChange(String status);
+    }
+
+    private WifiStatusListener listener;
+
+    // קונסטרקטור המקבל את ה-Listener (ה-Activity שלנו)
+    public WifiChangeReceiver(WifiStatusListener listener) {
+        this.listener = listener;
+    }
+    
+    // חובה ליישם את מתודת onReceive
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        // הלוגיקה תגיע בשקופית הבאה...
+    }
+}`,
+                task: "צור קובץ Java חדש בשם <code>WifiChangeReceiver.java</code> והעתק את הקוד כולל ה-<code>interface</code>.",
+                time: "זמן מוקצב: 15 דקות"
+            },
+            {
+                headline: "שלב 4: לוגיקת onReceive",
+                description: `
+                    <p>כאן נבדוק את מצב הקישוריות בפועל ונעביר את התוצאה ל-Activity באמצעות ה-<code>listener</code>.</p>
+                    
+                    <p class="font-bold text-indigo-700 mt-4">לגבי ה'המרה' (Casting):</p>
+                    <p>השורה <code>(ConnectivityManager) context.getSystemService(...)</code> דורשת המרה מפורשת. הסיבה לכך היא שהמתודה <code>context.getSystemService(...)</code> היא מתודה גנרית שמחזירה אובייקט מסוג כללי <code>Object</code> (במהדורות מסוימות). כדי שנוכל להשתמש במתודות הספציפיות של <code>ConnectivityManager</code> (כגון <code>getNetworkInfo</code>), המהדר של Java דורש שנגדיר באופן מפורש לאיזה סוג ספציפי אנו ממירים את האובייקט הגנרי. </p>
+                    
+                    <p class="mt-4">כעת, עליך להשלים את הלוגיקה שתשתמש באלמנטים שסופקו:</p>
+                `,
+                code: `// בתוך מתודת onReceive(Context context, Intent intent)
+
+// המרה לאחזור השירות:
+ConnectivityManager connManager = 
+    (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+
+// קבלת מידע על רשת ה-Wi-Fi (המשתנה שבו תשתמש):
+NetworkInfo wifiInfo = connManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
+
+// משתנה שיכיל את הסטטוס הסופי:
+String currentStatus = "בדיקה..."; 
+
+// --- השלם כאן את הלוגיקה שלך! ---
+// רמז: השתמש ב-if/else ובמתודה wifiInfo.isConnected()
+/*
+if (wifiInfo != null && wifiInfo.isConnected()) {
+    currentStatus = "מחובר ל-Wi-Fi! 🎉";
+} else {
+    currentStatus = "Wi-Fi מנותק. 😥";
+}
+*/
+// --- סוף הלוגיקה ---
+
+// שימוש ב-Listener כדי לעדכן את ה-Activity
+if (listener != null) {
+    listener.onWifiStatusChange(currentStatus);
+}`,
+                task: "השלם את הלוגיקה ב-<code>onReceive()</code>! עליך להשתמש ב-<code>wifiInfo</code> (שכבר הוגדר) כדי לבדוק האם ה-Wi-Fi מחובר או מנותק, ולעדכן את המשתנה <code>currentStatus</code> בהתאם. זכור להשתמש בבדיקה <code>wifiInfo.isConnected()</code>.",
+                time: "זמן מוקצב: 20 דקות"
+            },
+            {
+                headline: "שלב 5: הכנת ה-Activity",
+                description: "<p>ה-<code>MainActivity</code> צריכה ליישם את הממשק שיצרנו כדי לקבל את הסטטוס מה-<code>Receiver</code>.</p><p>בנוסף, נאתחל את ה-<code>TextView</code> וה-<code>Receiver</code> ב-<code>onCreate</code>.</p>",
+                code: `// ... imports
+
+public class MainActivity extends AppCompatActivity implements WifiChangeReceiver.WifiStatusListener {
+
+    private TextView wifiStatusTextView;
+    private WifiChangeReceiver wifiReceiver;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+        
+        wifiStatusTextView = findViewById(R.id.wifiStatusTextView);
+        
+        // יצירת Receiver והעברת 'this' כ-Listener
+        wifiReceiver = new WifiChangeReceiver(this); 
+    }
+    
+    // יישום המתודה מתוך הממשק - לעדכון ה-UI
+    @Override
+    public void onWifiStatusChange(String status) {
+        wifiStatusTextView.setText("מצב Wi-Fi: " + status);
+    }
+    
+    // ... נמשיך בשלב הבא עם onResume ו-onPause
+}`,
+                task: "עדכן את <code>MainActivity.java</code>: הוסף את ה-<code>implements</code>, אתחול ב-<code>onCreate</code>, ויישם את המתודה <code>onWifiStatusChange</code>.",
+                time: "זמן מוקצב: 10 דקות"
+            },
+            {
+                headline: "שלב 6: רישום דינמי ושחרור משאבים",
+                description: "<p>כדי להיות יעילים ולמנוע דליפות זיכרון, נשתמש במחזור החיים של ה-Activity:</p><ul><li class='list-disc pr-4'><strong><code>onResume()</code>:</strong> רישום ה-Receiver (Register) כשהמסך גלוי.</li><li class='list-disc pr-4'><strong><code>onPause()</code>:</strong> ביטול רישום ה-Receiver (Unregister) כשהמסך עובר לרקע.</li></ul>",
+                code: `// בתוך MainActivity.java
+
+@Override
+protected void onResume() {
+    super.onResume();
+    
+    // יצירת IntentFilter המציין לאיזה 'Action' להאזין
+    IntentFilter filter = new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION);
+    
+    // הרישום הדינמי מתבצע כאן:
+    registerReceiver(wifiReceiver, filter);
+}
+
+@Override
+protected void onPause() {
+    super.onPause();
+    
+    // ביטול הרישום ושחרור המשאבים מתבצע כאן:
+    unregisterReceiver(wifiReceiver);
+}`,
+                task: "הוסף את המתודות <code>onResume()</code> ו-<code>onPause()</code> ל-<code>MainActivity</code> לביצוע רישום דינמי ושחרור משאבים נכון.",
+                time: "זמן מוקצב: 15 דקות"
+            },
+            {
+                headline: "שלב 7: בדיקה ואימות 🧪",
+                description: "<p class='font-bold text-xl'>כעת הגיע שלב ההרצה והבדיקה!</p><p>וודא שביטלת את הרישום הסטטי ב-<code>AndroidManifest.xml</code> אם עשית אותו בטעות (מחוק את כל תג ה-<code><receiver></code>).</p>",
+                code: null,
+                task: "1. הרץ את האפליקציה על אמולטור או מכשיר.\n2. עבור להגדרות המכשיר וכבה והדלק את ה-Wi-Fi.\n3. ודא שהטקסט ב-<code>TextView</code> מתעדכן מיידית!",
+                time: "זמן מוקצב: 10 דקות"
+            },
+            {
+                headline: "שלב 8: אימות שחרור משאבים",
+                description: "<p>חשוב לוודא ששחרור המשאבים עובד, כדי למנוע דליפות זיכרון (Memory Leaks).</p><p class='font-bold'>בדיקה נוספת:</p>",
+                code: null,
+                task: "1. כשהאפליקציה פועלת, לחץ על כפתור הבית (מעבר לרקע).\n2. כבה והדלק Wi-Fi שוב בהגדרות המכשיר.\n3. חזור לאפליקציה: אם ה-Receiver עבד כהלכה, לא תקבל עדכון על שינוי ה-Wi-Fi עד שתחזור למסך.",
+                time: "זמן מוקצב: 5 דקות"
+            },
+            {
+                headline: "סיכום וסוף השיעור! 🏆",
+                description: "<p>כל הכבוד! למדת כיצד לבנות רכיב Android חשוב שמאפשר לאפליקציה שלך להגיב לאירועים חיצוניים בצורה יעילה וחסכונית במשאבים.</p><p class='font-bold text-indigo-700 mt-4'>מה למדת:</p><ul><li class='list-disc pr-4'>מהו BroadcastReceiver.</li><li class='list-disc pr-4'>רישום דינמי (<code>onResume</code>/<code>onPause</code>).</li><li class='list-disc pr-4'>תקשורת בין רכיבים באמצעות ממשק (Listener).</li></ul>",
+                code: null,
+                task: "<strong>אתגר להמשך:</strong> במקום לשנות את הטקסט, נסה לשנות את צבע הרקע של ה-Activity כאשר ה-Wi-Fi מחובר (לדוגמה, לירוק).",
+                time: "זמן מוקצב: 5 דקות"
+            }
+        ];
+
+        let currentSlideIndex = 0;
+
+        const lessonTitleEl = document.getElementById('lessonTitle');
+        const slideIndicatorEl = document.getElementById('slideIndicator');
+        const slideHeadlineEl = document.getElementById('slideHeadline');
+        const slideDescriptionEl = document.getElementById('slideDescription');
+        const slideCodeContainerEl = document.getElementById('slideCodeContainer');
+        const slideCodeEl = document.getElementById('slideCode');
+        const slideTaskEl = document.getElementById('slideTask');
+        const prevButton = document.getElementById('prevButton');
+        const nextButton = document.getElementById('nextButton');
+
+        function updateSlide() {
+            const slide = slides[currentSlideIndex];
+
+            // עדכון כותרת ראשית ואינדיקטור
+            lessonTitleEl.textContent = LESSON_TITLE;
+            slideIndicatorEl.textContent = `שלב ${currentSlideIndex + 1} מתוך ${slides.length} | ${slide.time}`;
+
+            // עדכון תוכן השקופית
+            slideHeadlineEl.textContent = slide.headline;
+            slideDescriptionEl.innerHTML = slide.description;
+            slideTaskEl.innerHTML = slide.task;
+
+            // עדכון הקוד
+            if (slide.code) {
+                slideCodeEl.textContent = slide.code.trim();
+                slideCodeContainerEl.classList.remove('hidden');
+            } else {
+                slideCodeContainerEl.classList.add('hidden');
+            }
+
+            // עדכון כפתורי ניווט
+            prevButton.disabled = currentSlideIndex === 0;
+            nextButton.textContent = currentSlideIndex === slides.length - 1 ? 'סיים שיעור' : 'הבא';
+            nextButton.disabled = false;
+        }
+
+        function handleNext() {
+            if (currentSlideIndex < slides.length - 1) {
+                currentSlideIndex++;
+                updateSlide();
+            } else {
+                // סיום השיעור - ניתן להוסיף כאן לוגיקת סיום
+                // שימוש בהצגה חלופית במקום alert
+                const container = document.getElementById('lessonContainer');
+                container.innerHTML = `
+                    <div class="p-8 text-center">
+                        <h2 class="text-4xl font-extrabold text-green-600 mb-4">🎉 כל הכבוד! 🎉</h2>
+                        <p class="text-xl text-gray-700">סיימת את שיעור ה-BroadcastReceiver בהצלחה.</p>
+                        <p class="mt-4 text-gray-500">אתה מוכן לאתגרים הבאים.</p>
+                    </div>
+                `;
+            }
+        }
+
+        function handlePrev() {
+            if (currentSlideIndex > 0) {
+                currentSlideIndex--;
+                updateSlide();
+            }
+        }
+
+        // הוספת Event Listeners לכפתורים
+        nextButton.addEventListener('click', handleNext);
+        prevButton.addEventListener('click', handlePrev);
+
+        // טעינת השקופית הראשונה
+        updateSlide();
+    </script>
+</body>
+</html>
